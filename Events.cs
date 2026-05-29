@@ -1,10 +1,11 @@
-﻿using CounterStrikeSharp.API;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using Microsoft.Extensions.Logging;
+using CounterStrikeSharp.API.Modules.Timers;
 
 namespace WeaponPaints
 {
@@ -152,7 +153,34 @@ namespace WeaponPaints
 			});
 			GivePlayerPin(player);
 
+			// === FIX - catches spawn, !knife, !wp, map bullshit ===
+			if (Config.Additional.KnifeEnabled || Config.Additional.SkinEnabled)
+			{
+				AddTimer(0.35f, () => ReApplyAllWeapons(player), TimerFlags.STOP_ON_MAPCHANGE);
+				AddTimer(0.85f, () => ReApplyAllWeapons(player), TimerFlags.STOP_ON_MAPCHANGE);
+			}
+
 			return HookResult.Continue;
+		}
+
+		private void ReApplyAllWeapons(CCSPlayerController player)
+		{
+			Server.NextFrame(() =>
+			{
+				if (player == null || !player.IsValid || !player.PlayerPawn.IsValid) return;
+
+				var weapons = player.PlayerPawn.Value?.WeaponServices?.MyWeapons;
+				if (weapons == null) return;
+
+				foreach (var handle in weapons)
+				{
+					var weapon = handle.Value;
+					if (weapon != null && weapon.IsValid)
+					{
+						GivePlayerWeaponSkin(player, weapon);
+					}
+				}
+			});
 		}
 
 		private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
